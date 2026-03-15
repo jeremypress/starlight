@@ -10,8 +10,8 @@
  * as distance increases.
  */
 export function spawnIntervalMs(distanceTraveled: number): number {
-  const startInterval = 1200
-  const minInterval = 250
+  const startInterval = 800
+  const minInterval = 150
   // Every 3000px of distance, interval drops by half (exponential ramp)
   const decay = Math.pow(0.5, distanceTraveled / 3000)
   return minInterval + (startInterval - minInterval) * decay
@@ -33,8 +33,12 @@ export function randomAsteroidSize(): { w: number; h: number } {
  * Spread widens slightly so some asteroids still appear at the edges.
  */
 export function spawnXNearPlayer(playerX: number, gameWidth = 360): number {
-  // Offset from player: normal-ish distribution via two random draws averaged
-  const spread = 120
+  // 30% chance: fully random position anywhere on screen
+  if (Math.random() < 0.3) {
+    return Math.floor(Math.random() * gameWidth)
+  }
+  // 70% chance: biased toward player with wider spread
+  const spread = 160
   const offset = (Math.random() + Math.random() - 1) * spread
   return Math.max(0, Math.min(gameWidth, Math.floor(playerX + offset)))
 }
