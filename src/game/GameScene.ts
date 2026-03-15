@@ -7,6 +7,9 @@ export class GameScene extends Phaser.Scene {
   private gyroY = 0
   private stars: Phaser.GameObjects.Rectangle[] = []
   private scrollSpeed = 100 // px/s, controlled by forward/back tilt
+  private tiltIndicator!: Phaser.GameObjects.Rectangle
+  private speedBar!: Phaser.GameObjects.Rectangle
+  private speedLabel!: Phaser.GameObjects.Text
 
   constructor(private betaOffset: number) {
     super({ key: 'GameScene' })
@@ -37,6 +40,34 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'monospace',
     })
 
+    // Vertical tilt indicator — track on the right edge, pip moves up/down
+    const tiltTrackX = 345
+    const tiltTrackH = 100
+    const tiltTrackY = 320 // center of screen
+    this.add.rectangle(tiltTrackX, tiltTrackY, 4, tiltTrackH, 0x444444)
+    this.tiltIndicator = this.add.rectangle(tiltTrackX, tiltTrackY, 8, 8, 0x00ff00)
+
+    // Speedometer — horizontal bar in bottom-left corner
+    const speedBarX = 10
+    const speedBarY = 620
+    const speedBarW = 80
+    this.add.text(speedBarX, speedBarY - 14, 'SPD', {
+      fontSize: '10px',
+      color: '#888888',
+      fontFamily: 'monospace',
+    })
+    this.add.rectangle(
+      speedBarX + speedBarW / 2, speedBarY + 4, speedBarW, 6, 0x444444
+    )
+    this.speedBar = this.add.rectangle(
+      speedBarX, speedBarY + 4, 0, 6, 0x00ff00
+    ).setOrigin(0, 0.5)
+    this.speedLabel = this.add.text(speedBarX + speedBarW + 4, speedBarY - 2, '', {
+      fontSize: '10px',
+      color: '#ffffff',
+      fontFamily: 'monospace',
+    })
+
     // Listen for device orientation
     window.addEventListener('deviceorientation', this.handleOrientation.bind(this))
 
@@ -60,16 +91,17 @@ export class GameScene extends Phaser.Scene {
   update(_time: number, delta: number) {
     const body = this.ship.body as Phaser.Physics.Arcade.Body
 
-    // Tilt applies acceleration, not direct velocity — ship holds momentum at neutral
-    const acceleration = 15
-    const maxTilt = 30
+    const maxTiltX = 30
+    const maxTiltY = 10 // much smaller range — slight tilt = full throttle/brake
+    const maxSpeed = 300
     const dt = delta / 1000
 
-    const clampedX = Phaser.Math.Clamp(this.gyroX, -maxTilt, maxTilt)
-    const clampedY = Phaser.Math.Clamp(this.gyroY - this.betaOffset, -maxTilt, maxTilt)
+    const clampedX = Phaser.Math.Clamp(this.gyroX, -maxTiltX, maxTiltX)
+    const clampedY = Phaser.Math.Clamp(this.gyroY - this.betaOffset, -maxTiltY, maxTiltY)
 
-    // X: steer left/right with momentum
-    body.setAccelerationX(clampedX * acceleration)
+    // X: tilt maps directly to velocity — instant direction change
+    body.setAccelerationX(0)
+    body.setVelocityX((clampedX / maxTiltX) * maxSpeed)
 
     // Y: locked — ship stays fixed on screen, world scrolls instead
     body.setAccelerationY(0)
@@ -80,7 +112,7 @@ export class GameScene extends Phaser.Scene {
     const maxScroll = 500
     const scrollAccel = 150 // px/s²
     this.scrollSpeed = Phaser.Math.Clamp(
-      this.scrollSpeed + (-clampedY / maxTilt) * scrollAccel * dt,
+      this.scrollSpeed + (-clampedY / maxTiltY) * scrollAccel * dt,
       minScroll,
       maxScroll
     )
@@ -94,6 +126,28 @@ export class GameScene extends Phaser.Scene {
       if (star.y < 0) star.y += 640
       if (star.y > 640) star.y -= 640
     }
+
+    // Update vertical tilt indicator — pip moves along the track
+    const tiltRatio = clampedY / maxTiltY // -1 (forward) to 1 (back)
+    this.tiltIndicator.y = 320 + tiltRatio * 50 // ±50px from center
+    // Color: green when tilting forward (speeding up), red when back (slowing)
+    this.tiltIndicator.fillColor = tiltRatio < 0 ? 0x00ff00 : 0xff4444
+
+    // Update speedometer bar
+    const minScroll2 = minScroll
+    const maxScroll2 = maxScroll
+    const speedRatio = (this.scrollSpeed - minScroll2) / (maxScroll2 - minScroll2)
+    const barWidth = speedRatio * 80
+    this.speedBar.width = barWidth
+    // Color shifts from white to yellow to red as speed increases
+    if (speedRatio < 0.5) {
+      this.speedBar.fillColor = 0xffffff
+    } else if (speedRatio < 0.8) {
+      this.speedBar.fillColor = 0xffff00
+    } else {
+      this.speedBar.fillColor = 0xff4444
+    }
+    this.speedLabel.setText(`${this.scrollSpeed.toFixed(0)}`)
 
     // Update debug text
     this.debugText.setText(
