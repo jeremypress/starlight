@@ -1,4 +1,5 @@
 import Phaser from 'phaser'
+import { spawnIntervalMs, randomAsteroidSize, spawnXNearPlayer } from './asteroids.ts'
 
 export class GameScene extends Phaser.Scene {
   private ship!: Phaser.GameObjects.Rectangle
@@ -10,8 +11,17 @@ export class GameScene extends Phaser.Scene {
   private speedBar!: Phaser.GameObjects.Rectangle
   private speedLabel!: Phaser.GameObjects.Text
 
-  constructor(private betaOffset: number) {
+  // Asteroids
+  private asteroids: Phaser.GameObjects.Rectangle[] = []
+  private distanceTraveled = 0
+  private timeSinceLastSpawn = 0
+  private dead = false
+
+  private onGameOver?: (distance: number) => void
+
+  constructor(private betaOffset: number, onGameOver?: (distance: number) => void) {
     super({ key: 'GameScene' })
+    this.onGameOver = onGameOver
   }
 
   setBetaOffset(offset: number) {
@@ -84,7 +94,28 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Reset game state for a fresh run (called on restart). */
+  restart() {
+    // Remove all asteroids
+    for (const a of this.asteroids) {
+      a.destroy()
+    }
+    this.asteroids = []
+    this.distanceTraveled = 0
+    this.timeSinceLastSpawn = 0
+    this.scrollSpeed = 100
+    this.dead = false
+
+    // Reset ship position
+    this.ship.setPosition(180, 500)
+    this.ship.setAlpha(1)
+    const body = this.ship.body as Phaser.Physics.Arcade.Body
+    body.setVelocity(0, 0)
+  }
+
   update(_time: number, delta: number) {
+    if (this.dead) return
+
     const body = this.ship.body as Phaser.Physics.Arcade.Body
 
     const maxTiltX = 30
@@ -113,6 +144,9 @@ export class GameScene extends Phaser.Scene {
       maxScroll
     )
 
+    // Track distance for spawn rate
+    this.distanceTraveled += this.scrollSpeed * dt
+
     // Scroll stars downward at current speed; horizontal parallax from lateral movement
     for (const star of this.stars) {
       star.y += this.scrollSpeed * dt
@@ -123,6 +157,48 @@ export class GameScene extends Phaser.Scene {
       if (star.y > 640) star.y -= 640
     }
 
+    // --- Asteroid spawning ---
+    this.timeSinceLastSpawn += delta
+    const interval = spawnIntervalMs(this.distanceTraveled)
+    if (this.timeSinceLastSpawn >= interval) {
+      this.timeSinceLastSpawn = 0
+      this.spawnAsteroid()
+    }
+
+    // --- Move asteroids & check collisions ---
+    const shipBody = this.ship.body as Phaser.Physics.Arcade.Body
+    for (let i = this.asteroids.length - 1; i >= 0; i--) {
+      const a = this.asteroids[i]
+
+      // Scroll down with the world + parallax + slight ambient drift
+      a.y += this.scrollSpeed * dt
+      a.x -= body.velocity.x * 0.3 * dt
+      a.x += (a.getData('driftX') as number) * dt
+
+      // Wrap horizontally
+      if (a.x < -30) a.x += 420
+      if (a.x > 390) a.x -= 420
+
+      // Remove if off screen below
+      if (a.y > 700) {
+        a.destroy()
+        this.asteroids.splice(i, 1)
+        continue
+      }
+
+      // Simple AABB collision check against the ship
+      const ab = a.body as Phaser.Physics.Arcade.Body
+      if (
+        shipBody.x < ab.x + ab.width &&
+        shipBody.x + shipBody.width > ab.x &&
+        shipBody.y < ab.y + ab.height &&
+        shipBody.y + shipBody.height > ab.y
+      ) {
+        this.die()
+        return
+      }
+    }
+
     // Update vertical tilt indicator — pip moves along the track
     const tiltRatio = clampedY / maxTiltY // -1 (forward) to 1 (back)
     this.tiltIndicator.y = 320 + tiltRatio * 50 // ±50px from center
@@ -130,9 +206,7 @@ export class GameScene extends Phaser.Scene {
     this.tiltIndicator.fillColor = tiltRatio < 0 ? 0x00ff00 : 0xff4444
 
     // Update speedometer bar
-    const minScroll2 = minScroll
-    const maxScroll2 = maxScroll
-    const speedRatio = (this.scrollSpeed - minScroll2) / (maxScroll2 - minScroll2)
+    const speedRatio = (this.scrollSpeed - minScroll) / (maxScroll - minScroll)
     const barWidth = speedRatio * 80
     this.speedBar.width = barWidth
     // Color shifts from white to yellow to red as speed increases
@@ -144,7 +218,39 @@ export class GameScene extends Phaser.Scene {
       this.speedBar.fillColor = 0xff4444
     }
     this.speedLabel.setText(`${this.scrollSpeed.toFixed(0)}`)
+  }
 
+  private spawnAsteroid() {
+    const x = spawnXNearPlayer(this.ship.x)
+    const { w, h } = randomAsteroidSize()
+    // Grey color with slight variation
+    const grey = Phaser.Math.Between(0x55, 0x99)
+    const color = (grey << 16) | (grey << 8) | grey
+
+    const asteroid = this.add.rectangle(x, -h, w, h, color)
+    this.physics.add.existing(asteroid)
+    const ab = asteroid.body as Phaser.Physics.Arcade.Body
+    ab.setImmovable(true)
+
+    // Each asteroid gets a small random horizontal drift for ambient floating
+    asteroid.setData('driftX', Phaser.Math.Between(-30, 30))
+
+    this.asteroids.push(asteroid)
+  }
+
+  private die() {
+    this.dead = true
+    const body = this.ship.body as Phaser.Physics.Arcade.Body
+    body.setVelocity(0, 0)
+    this.ship.setAlpha(0.4)
+
+    // Notify React to show game-over overlay
+    const distance = Math.floor(this.distanceTraveled / 100) // score in "meters"
+    this.onGameOver?.(distance)
+  }
+
+  getDistanceScore(): number {
+    return Math.floor(this.distanceTraveled / 100)
   }
 
   destroy() {

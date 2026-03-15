@@ -8,3 +8,6 @@ now i'm trying to figure out the scrolling so that you're challenged to keep mov
 trying things out in conductor. going to keep working on ship movement since I think there are a few obvious things we can fix before we take a step back and plan things out
 - going to add distance markers so i can get a better sense of speed
 - steering left and right is wrong, its not a vector in the way that speed is, if you're turning left and then start turning right you should immediately be moving right instead of decreasing your leftness
+- ok things now feel tighter, i added some more useful diagnostic info as well as a pause flow
+- I think the next most important thing in the loop being fun is adding asteroids to dodge and enemies to fight. if that is all feeling good then spending time on things like art and then cutscenes means we can round out the whole PoC
+- lets start with asteroids as rectangles, then enemeies, then shooting them down

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Phaser from 'phaser'
 import { GameScene } from './game/GameScene'
 
-type Phase = 'permission' | 'calibrating' | 'playing' | 'paused'
+type Phase = 'permission' | 'calibrating' | 'playing' | 'paused' | 'dead'
 
 const CALIBRATION_MS = 1500
 
@@ -11,6 +11,7 @@ export default function App() {
   const sceneRef = useRef<GameScene | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [phase, setPhase] = useState<Phase>('permission')
+  const [score, setScore] = useState(0)
   const currentBetaRef = useRef<number | null>(null)
   const betaOffsetRef = useRef<number | null>(null)
 
@@ -61,7 +62,10 @@ export default function App() {
   useEffect(() => {
     if (phase !== 'playing' || !containerRef.current || gameRef.current) return
 
-    const scene = new GameScene(betaOffsetRef.current!)
+    const scene = new GameScene(betaOffsetRef.current!, (distance) => {
+      setScore(distance)
+      setPhase('dead')
+    })
     sceneRef.current = scene
 
     const config: Phaser.Types.Core.GameConfig = {
@@ -98,6 +102,11 @@ export default function App() {
   }
 
   const handleResume = () => {
+    setPhase('calibrating')
+  }
+
+  const handleRestart = () => {
+    sceneRef.current?.restart()
     setPhase('calibrating')
   }
 
@@ -205,6 +214,41 @@ export default function App() {
             }}
           >
             RESUME
+          </button>
+        </div>
+      )}
+
+      {/* Game over overlay */}
+      {phase === 'dead' && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.75)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 20,
+            fontFamily: 'monospace',
+            color: '#fff',
+          }}
+        >
+          <p style={{ fontSize: '2rem', marginBottom: '0.5rem', color: '#ff4444' }}>GAME OVER</p>
+          <p style={{ fontSize: '1.2rem', marginBottom: '2rem', opacity: 0.8 }}>{score}m</p>
+          <button
+            onClick={handleRestart}
+            style={{
+              padding: '12px 32px',
+              background: 'transparent',
+              border: '2px solid #fff',
+              color: '#fff',
+              fontSize: '1.1rem',
+              fontFamily: 'monospace',
+              cursor: 'pointer',
+            }}
+          >
+            RESTART
           </button>
         </div>
       )}
