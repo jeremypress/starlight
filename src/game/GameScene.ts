@@ -1,5 +1,6 @@
 import Phaser from 'phaser'
 import { spawnIntervalMs, randomAsteroidSize, spawnXNearPlayer } from './asteroids.ts'
+import { difficultyAt } from './difficulty.ts'
 
 export class GameScene extends Phaser.Scene {
   private ship!: Phaser.GameObjects.Rectangle
@@ -16,6 +17,7 @@ export class GameScene extends Phaser.Scene {
   private distanceTraveled = 0
   private timeSinceLastSpawn = 0
   private dead = false
+  private elapsedTime = 0
 
   private onGameOver?: (distance: number) => void
 
@@ -105,6 +107,7 @@ export class GameScene extends Phaser.Scene {
     this.timeSinceLastSpawn = 0
     this.scrollSpeed = 100
     this.dead = false
+    this.elapsedTime = 0
 
     // Reset ship position
     this.ship.setPosition(180, 500)
@@ -135,8 +138,8 @@ export class GameScene extends Phaser.Scene {
     body.setVelocityY(0)
 
     // Forward/back tilt accelerates or decelerates scroll speed
-    const minScroll = 80
-    const maxScroll = 500
+    this.elapsedTime += dt
+    const { minScroll, maxScroll, asteroidExtraSpeed } = difficultyAt(this.elapsedTime)
     const scrollAccel = 150 // px/s²
     this.scrollSpeed = Phaser.Math.Clamp(
       this.scrollSpeed + (-clampedY / maxTiltY) * scrollAccel * dt,
@@ -170,8 +173,8 @@ export class GameScene extends Phaser.Scene {
     for (let i = this.asteroids.length - 1; i >= 0; i--) {
       const a = this.asteroids[i]
 
-      // Scroll down with the world + parallax + slight ambient drift
-      a.y += this.scrollSpeed * dt
+      // Scroll down with the world + extra speed from difficulty + parallax
+      a.y += (this.scrollSpeed + asteroidExtraSpeed) * dt
       a.x -= body.velocity.x * 0.3 * dt
       a.x += (a.getData('driftX') as number) * dt
 
