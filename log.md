@@ -11,3 +11,5 @@ trying things out in conductor. going to keep working on ship movement since I t
 - ok things now feel tighter, i added some more useful diagnostic info as well as a pause flow
 - I think the next most important thing in the loop being fun is adding asteroids to dodge and enemies to fight. if that is all feeling good then spending time on things like art and then cutscenes means we can round out the whole PoC
 - lets start with asteroids as rectangles, then enemeies, then shooting them down
+- ok initial asteroids are in. they feel good but a couple of issues. its too easy to just slow down and sort of cheat to get out of a sticky situation, and it feels a bit too easy even at full speed. so for one we should make the min speed higher and 2 we should increase asteroid rate and speed as you go to make dodging more of a challenge
+- also discussed incentives with soren, why do you want to keep going. the story will play in here but we need more feedback loops around distance or collecting things that make playing feel good
