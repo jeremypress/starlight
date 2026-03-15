@@ -1,6 +1,11 @@
 import { execSync, spawn } from 'child_process'
+import { existsSync, mkdirSync } from 'fs'
 import qrcode from 'qrcode-terminal'
 import path from 'path'
+
+const certDir = path.join(import.meta.dirname, '..', 'certs')
+const certPath = path.join(certDir, 'cert.pem')
+const keyPath = path.join(certDir, 'key.pem')
 
 // Get Tailscale hostname
 function getTailscaleHostname(): string | null {
@@ -11,6 +16,33 @@ function getTailscaleHostname(): string | null {
   } catch {
     return null
   }
+}
+
+function ensureCerts(hostname: string | null) {
+  if (existsSync(certPath) && existsSync(keyPath)) {
+    return
+  }
+
+  console.log('  Generating mkcert certificates...')
+
+  try {
+    execSync('which mkcert', { stdio: 'ignore' })
+  } catch {
+    console.error('  ERROR: mkcert not found. Install it with: brew install mkcert && mkcert -install')
+    process.exit(1)
+  }
+
+  mkdirSync(certDir, { recursive: true })
+
+  const domains = ['localhost', '127.0.0.1']
+  if (hostname) domains.unshift(hostname)
+
+  execSync(
+    `mkcert -cert-file "${certPath}" -key-file "${keyPath}" ${domains.join(' ')}`,
+    { stdio: 'inherit' }
+  )
+
+  console.log('  Certificates generated.\n')
 }
 
 // Get mkcert CA path
@@ -26,6 +58,8 @@ console.log('\n')
 console.log('='.repeat(55))
 console.log('  STARLIGHT DEV SERVER')
 console.log('='.repeat(55))
+
+ensureCerts(hostname)
 
 if (hostname) {
   const url = `https://${hostname}:${port}`
