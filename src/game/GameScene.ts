@@ -2,7 +2,6 @@ import Phaser from 'phaser'
 
 export class GameScene extends Phaser.Scene {
   private ship!: Phaser.GameObjects.Rectangle
-  private debugText!: Phaser.GameObjects.Text
   private gyroX = 0
   private gyroY = 0
   private stars: Phaser.GameObjects.Rectangle[] = []
@@ -13,6 +12,10 @@ export class GameScene extends Phaser.Scene {
 
   constructor(private betaOffset: number) {
     super({ key: 'GameScene' })
+  }
+
+  setBetaOffset(offset: number) {
+    this.betaOffset = offset
   }
 
   create() {
@@ -32,13 +35,6 @@ export class GameScene extends Phaser.Scene {
     const body = this.ship.body as Phaser.Physics.Arcade.Body
     body.setCollideWorldBounds(true)
     body.setMaxVelocity(300)
-
-    // Debug text to show gyro values
-    this.debugText = this.add.text(10, 10, 'Gyro: waiting...', {
-      fontSize: '14px',
-      color: '#ffffff',
-      fontFamily: 'monospace',
-    })
 
     // Vertical tilt indicator — track on the right edge, pip moves up/down
     const tiltTrackX = 345
@@ -149,12 +145,6 @@ export class GameScene extends Phaser.Scene {
     }
     this.speedLabel.setText(`${this.scrollSpeed.toFixed(0)}`)
 
-    // Update debug text
-    this.debugText.setText(
-      `Gyro X: ${this.gyroX.toFixed(1)}\n` +
-      `Gyro Y: ${this.gyroY.toFixed(1)}\n` +
-      `Scroll: ${this.scrollSpeed.toFixed(0)} px/s`
-    )
   }
 
   destroy() {

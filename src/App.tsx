@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from 'react'
 import Phaser from 'phaser'
 import { GameScene } from './game/GameScene'
 
-type Phase = 'permission' | 'calibrating' | 'playing'
+type Phase = 'permission' | 'calibrating' | 'playing' | 'paused'
+
+const CALIBRATION_MS = 1500
 
 export default function App() {
   const gameRef = useRef<Phaser.Game | null>(null)
+  const sceneRef = useRef<GameScene | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [phase, setPhase] = useState<Phase>('permission')
-  const [countdown, setCountdown] = useState(3)
   const currentBetaRef = useRef<number | null>(null)
   const betaOffsetRef = useRef<number | null>(null)
 
@@ -27,37 +29,40 @@ export default function App() {
     }
   }
 
-  // Track live beta during calibration
+  const captureBetaAndPlay = () => {
+    // Capture current beta as the "resting" offset
+    betaOffsetRef.current = currentBetaRef.current ?? 45
+    if (sceneRef.current) {
+      sceneRef.current.setBetaOffset(betaOffsetRef.current)
+      sceneRef.current.scene.resume()
+    }
+    setPhase('playing')
+  }
+
+  // Always track live beta so we can capture it on demand
   useEffect(() => {
-    if (phase !== 'calibrating') return
     const handler = (e: DeviceOrientationEvent) => {
       if (e.beta !== null) currentBetaRef.current = e.beta
     }
     window.addEventListener('deviceorientation', handler)
     return () => window.removeEventListener('deviceorientation', handler)
-  }, [phase])
+  }, [])
 
-  // Countdown then capture beta offset
+  // Calibration: wait CALIBRATION_MS then capture beta and start/resume playing
   useEffect(() => {
     if (phase !== 'calibrating') return
-    setCountdown(3)
-    let count = 3
-    const interval = setInterval(() => {
-      count--
-      if (count > 0) {
-        setCountdown(count)
-      } else {
-        clearInterval(interval)
-        betaOffsetRef.current = currentBetaRef.current ?? 45
-        setPhase('playing')
-      }
-    }, 1000)
-    return () => clearInterval(interval)
+    const timeout = setTimeout(() => {
+      captureBetaAndPlay()
+    }, CALIBRATION_MS)
+    return () => clearTimeout(timeout)
   }, [phase])
 
-  // Create Phaser game once calibration is done
+  // Create Phaser game once calibration is done (first time only)
   useEffect(() => {
     if (phase !== 'playing' || !containerRef.current || gameRef.current) return
+
+    const scene = new GameScene(betaOffsetRef.current!)
+    sceneRef.current = scene
 
     const config: Phaser.Types.Core.GameConfig = {
       type: Phaser.AUTO,
@@ -75,7 +80,7 @@ export default function App() {
           debug: true,
         },
       },
-      scene: [new GameScene(betaOffsetRef.current!)],
+      scene: [scene],
     }
 
     gameRef.current = new Phaser.Game(config)
@@ -83,8 +88,18 @@ export default function App() {
     return () => {
       gameRef.current?.destroy(true)
       gameRef.current = null
+      sceneRef.current = null
     }
   }, [phase])
+
+  const handlePause = () => {
+    sceneRef.current?.scene.pause()
+    setPhase('paused')
+  }
+
+  const handleResume = () => {
+    setPhase('calibrating')
+  }
 
   if (phase === 'permission') {
     return (
@@ -109,7 +124,7 @@ export default function App() {
     )
   }
 
-  if (phase === 'calibrating') {
+  if (phase === 'calibrating' && !gameRef.current) {
     return (
       <div
         style={{
@@ -124,11 +139,95 @@ export default function App() {
           fontFamily: 'monospace',
         }}
       >
-        <p style={{ fontSize: '1.2rem', opacity: 0.8, marginBottom: '2rem' }}>Hold your phone steady</p>
-        <p style={{ fontSize: '5rem', fontWeight: 'bold' }}>{countdown}</p>
+        <p style={{ fontSize: '1.2rem', opacity: 0.8 }}>Hold your phone steady</p>
       </div>
     )
   }
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+  // Playing, paused, or recalibrating (with game visible behind)
+  return (
+    <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Pause button — bottom right */}
+      {phase === 'playing' && (
+        <button
+          onClick={handlePause}
+          style={{
+            position: 'absolute',
+            bottom: '16px',
+            right: '16px',
+            width: '40px',
+            height: '40px',
+            background: 'rgba(0, 0, 0, 0.6)',
+            border: '2px solid #888',
+            color: '#fff',
+            fontSize: '18px',
+            fontFamily: 'monospace',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10,
+          }}
+        >
+          ⏸
+        </button>
+      )}
+
+      {/* Pause menu overlay */}
+      {phase === 'paused' && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 20,
+            fontFamily: 'monospace',
+            color: '#fff',
+          }}
+        >
+          <p style={{ fontSize: '1.5rem', marginBottom: '2rem' }}>PAUSED</p>
+          <button
+            onClick={handleResume}
+            style={{
+              padding: '12px 32px',
+              background: 'transparent',
+              border: '2px solid #fff',
+              color: '#fff',
+              fontSize: '1.1rem',
+              fontFamily: 'monospace',
+              cursor: 'pointer',
+            }}
+          >
+            RESUME
+          </button>
+        </div>
+      )}
+
+      {/* Recalibration overlay */}
+      {phase === 'calibrating' && gameRef.current && (
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.7)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 20,
+            fontFamily: 'monospace',
+            color: '#fff',
+          }}
+        >
+          <p style={{ fontSize: '1.2rem', opacity: 0.8 }}>Hold your phone steady</p>
+        </div>
+      )}
+    </div>
+  )
 }
