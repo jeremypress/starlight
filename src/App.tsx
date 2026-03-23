@@ -73,6 +73,7 @@ export default function App() {
       parent: containerRef.current,
       width: 360,
       height: 640,
+      pixelArt: true, // nearest-neighbor scaling — keeps sprites crisp
       backgroundColor: '#000000',
       scale: {
         mode: Phaser.Scale.FIT,
