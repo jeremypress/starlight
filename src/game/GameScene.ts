@@ -1,6 +1,7 @@
 import Phaser from 'phaser'
 import { spawnIntervalMs, randomAsteroidSize, spawnXNearPlayer } from './asteroids.ts'
 import { difficultyAt } from './difficulty.ts'
+import { triangleRectOverlap } from './collision.ts'
 
 export class GameScene extends Phaser.Scene {
   private ship!: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Sprite
@@ -56,7 +57,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.physics.add.existing(this.ship)
 
-    const body = this.ship.body
+    const body = this.ship.body as Phaser.Physics.Arcade.Body
     body.setCollideWorldBounds(true)
     body.setMaxVelocity(300)
 
@@ -181,7 +182,6 @@ export class GameScene extends Phaser.Scene {
     }
 
     // --- Move asteroids & check collisions ---
-    const shipBody = this.ship.body as Phaser.Physics.Arcade.Body
     for (let i = this.asteroids.length - 1; i >= 0; i--) {
       const a = this.asteroids[i]
 
@@ -201,14 +201,17 @@ export class GameScene extends Phaser.Scene {
         continue
       }
 
-      // Simple AABB collision check against the ship
+      // Triangle-vs-rectangle collision check against the ship
+      // Ship sprite is 32×32, centered — triangle vertices match the drawn pixels
+      const halfW = this.ship.displayWidth / 2
+      const halfH = this.ship.displayHeight / 2
+      const shipTri: [{ x: number; y: number }, { x: number; y: number }, { x: number; y: number }] = [
+        { x: this.ship.x, y: this.ship.y - halfH },           // top center
+        { x: this.ship.x - halfW, y: this.ship.y + halfH },   // bottom-left
+        { x: this.ship.x + halfW, y: this.ship.y + halfH },   // bottom-right
+      ]
       const ab = a.body as Phaser.Physics.Arcade.Body
-      if (
-        shipBody.x < ab.x + ab.width &&
-        shipBody.x + shipBody.width > ab.x &&
-        shipBody.y < ab.y + ab.height &&
-        shipBody.y + shipBody.height > ab.y
-      ) {
+      if (triangleRectOverlap(shipTri, { x: ab.x, y: ab.y, w: ab.width, h: ab.height })) {
         this.die()
         return
       }
