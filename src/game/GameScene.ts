@@ -3,7 +3,7 @@ import { spawnIntervalMs, randomAsteroidSize, spawnXNearPlayer } from './asteroi
 import { difficultyAt } from './difficulty.ts'
 
 export class GameScene extends Phaser.Scene {
-  private ship!: Phaser.GameObjects.Rectangle
+  private ship!: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Sprite
   private gyroX = 0
   private gyroY = 0
   private stars: Phaser.GameObjects.Rectangle[] = []
@@ -30,6 +30,14 @@ export class GameScene extends Phaser.Scene {
     this.betaOffset = offset
   }
 
+  preload() {
+    // Load sprite assets — drop .png files into public/sprites/
+    // The ship sprite should be named "ship.png" (recommended: 32×32 pixels)
+    this.load.image('ship', 'sprites/ship.png')
+    // Silence errors for missing sprites so the game still works without them
+    this.load.on('loaderror', () => { /* sprite not yet added, use fallback */ })
+  }
+
   create() {
     // Scatter small stars across the canvas for spatial reference
     for (let i = 0; i < 60; i++) {
@@ -40,11 +48,15 @@ export class GameScene extends Phaser.Scene {
       this.stars.push(this.add.rectangle(x, y, size, size, 0xffffff).setAlpha(alpha))
     }
 
-    // Create the ship (red square for now)
-    this.ship = this.add.rectangle(180, 500, 40, 40, 0xff0000)
+    // Create the ship — use sprite if available, red square as fallback
+    if (this.textures.exists('ship')) {
+      this.ship = this.add.sprite(180, 500, 'ship')
+    } else {
+      this.ship = this.add.rectangle(180, 500, 40, 40, 0xff0000)
+    }
     this.physics.add.existing(this.ship)
 
-    const body = this.ship.body as Phaser.Physics.Arcade.Body
+    const body = this.ship.body
     body.setCollideWorldBounds(true)
     body.setMaxVelocity(300)
 
