@@ -160,6 +160,18 @@ export class GameScene extends Phaser.Scene {
       maxScroll
     )
 
+    // Left/right tilt → bank the ship (rotation around Z)
+    const normX = clampedX / maxTiltX   // -1..1
+    const normY = clampedY / maxTiltY   // -1 = forward (fast), +1 = back (slow)
+    const maxRotation = Phaser.Math.DegToRad(25)
+    this.ship.setRotation(normX * maxRotation)
+
+    // Forward/back tilt → stretch the sprite along Y to simulate pitching
+    // Back tilt (normY > 0, slowing): nose stretches up → scaleY > 1
+    // Forward tilt (normY < 0, speeding): nose compresses → scaleY < 1
+    const scaleY = 1 + normY * 0.15
+    this.ship.setScale(1, scaleY)
+
     // Track distance for spawn rate
     this.distanceTraveled += this.scrollSpeed * dt
 
