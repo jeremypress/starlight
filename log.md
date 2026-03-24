@@ -13,3 +13,19 @@ trying things out in conductor. going to keep working on ship movement since I t
 - lets start with asteroids as rectangles, then enemeies, then shooting them down
 - ok initial asteroids are in. they feel good but a couple of issues. its too easy to just slow down and sort of cheat to get out of a sticky situation, and it feels a bit too easy even at full speed. so for one we should make the min speed higher and 2 we should increase asteroid rate and speed as you go to make dodging more of a challenge
 - also discussed incentives with soren, why do you want to keep going. the story will play in here but we need more feedback loops around distance or collecting things that make playing feel good
+
+## 03/23
+ok we're back again. I think the flying control is decent enough to progress, so its time to replace our boxes with some real graphics. lets start with the ship. I have aseprite on my mac so lets just try using that and see what we can come up with 
+
+## 03/24
+Didn't do too much yesterday but that's ok. i drew a very basic ship sprite and it looks like a ship. I also made the hitbox tight to the sprite for more accuracy.
+
+I can sort of see the rest of the high level in order to get to an e2e version of the game
+1. asteroid design
+2. shooting
+3. enemies
+4. cutscenes
+5. rig up story mode
+6. endless mode/ scores
+7. music and polish
+    - better art, transitions, shaders, etc
