@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Phaser from 'phaser'
 import { GameScene } from './game/GameScene'
-import { isNativeApp, onTilt, requestTiltPermission } from './input/tilt.ts'
+import { DEFAULT_GRAVITY, isNativeApp, onGravity, requestTiltPermission } from './input/tilt.ts'
+import type { Vec3 } from './input/gravityToTilt.ts'
 
 type Phase = 'permission' | 'calibrating' | 'playing' | 'paused' | 'dead'
 
@@ -13,27 +14,27 @@ export default function App() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [phase, setPhase] = useState<Phase>('permission')
   const [score, setScore] = useState(0)
-  const currentBetaRef = useRef<number | null>(null)
-  const betaOffsetRef = useRef<number | null>(null)
+  const currentGravityRef = useRef<Vec3 | null>(null)
+  const referenceRef = useRef<Vec3>(DEFAULT_GRAVITY)
 
   const requestGyroscope = async () => {
     if (await requestTiltPermission()) setPhase('calibrating')
   }
 
   const captureBetaAndPlay = () => {
-    // Capture current beta as the "resting" offset
-    betaOffsetRef.current = currentBetaRef.current ?? 45
+    // Capture how the phone is being held right now as the "neutral" pose
+    referenceRef.current = currentGravityRef.current ?? DEFAULT_GRAVITY
     if (sceneRef.current) {
-      sceneRef.current.setBetaOffset(betaOffsetRef.current)
+      sceneRef.current.setReference(referenceRef.current)
       sceneRef.current.scene.resume()
     }
     setPhase('playing')
   }
 
-  // Always track live beta so we can capture it on demand
+  // Always track live gravity so we can capture it on demand
   useEffect(() => {
-    return onTilt(({ beta }) => {
-      currentBetaRef.current = beta
+    return onGravity((gravity) => {
+      currentGravityRef.current = gravity
     })
   }, [])
 
@@ -50,7 +51,7 @@ export default function App() {
   useEffect(() => {
     if (phase !== 'playing' || !containerRef.current || gameRef.current) return
 
-    const scene = new GameScene(betaOffsetRef.current!, (distance) => {
+    const scene = new GameScene(referenceRef.current, (distance) => {
       setScore(distance)
       setPhase('dead')
     })

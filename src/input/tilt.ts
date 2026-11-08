@@ -1,7 +1,8 @@
-import { gravityToTilt, type Tilt } from './gravityToTilt.ts'
+import { tiltToGravity, type Vec3 } from './gravityToTilt.ts'
 
 /**
- * One place for the game to get tilt readings, wherever they come from:
+ * One place for the game to get motion readings, wherever they come from.
+ * Readings are gravity vectors (see gravityToTilt.ts for the axes):
  * - Inside the iOS app: CoreMotion gravity readings sent in by the native shell.
  * - In a browser: the standard `deviceorientation` event.
  */
@@ -25,19 +26,22 @@ export async function requestTiltPermission(): Promise<boolean> {
   }
 }
 
-/** Subscribe to tilt readings. Returns a function that unsubscribes. */
-export function onTilt(callback: (tilt: Tilt) => void): () => void {
+/** Gravity for a phone held at a comfortable 45° — used if no reading has arrived yet. */
+export const DEFAULT_GRAVITY: Vec3 = tiltToGravity(45, 0)
+
+/** Subscribe to gravity readings. Returns a function that unsubscribes. */
+export function onGravity(callback: (gravity: Vec3) => void): () => void {
   if (isNativeApp) {
     const handler = (e: Event) => {
-      const { x, y, z } = (e as CustomEvent<{ x: number; y: number; z: number }>).detail
-      callback(gravityToTilt(x, y, z))
+      const { x, y, z } = (e as CustomEvent<Vec3>).detail
+      callback({ x, y, z })
     }
     window.addEventListener(NATIVE_GRAVITY_EVENT, handler)
     return () => window.removeEventListener(NATIVE_GRAVITY_EVENT, handler)
   }
 
   const handler = (e: DeviceOrientationEvent) => {
-    if (e.beta !== null && e.gamma !== null) callback({ beta: e.beta, gamma: e.gamma })
+    if (e.beta !== null && e.gamma !== null) callback(tiltToGravity(e.beta, e.gamma))
   }
   window.addEventListener('deviceorientation', handler)
   return () => window.removeEventListener('deviceorientation', handler)

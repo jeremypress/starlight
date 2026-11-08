@@ -11,6 +11,13 @@
  *   z = -cos(beta) * cos(gamma)
  * and this function solves those equations for beta and gamma.
  */
+/** A 3D vector in the phone's coordinate frame. */
+export interface Vec3 {
+  x: number
+  y: number
+  z: number
+}
+
 export interface Tilt {
   /** Front/back tilt in degrees, -180..180. 0 = flat, 90 = upright facing you. */
   beta: number
@@ -19,6 +26,7 @@ export interface Tilt {
 }
 
 const RAD_TO_DEG = 180 / Math.PI
+const DEG_TO_RAD = Math.PI / 180
 
 export function gravityToTilt(x: number, y: number, z: number): Tilt {
   // gamma is kept in -90..90 (like the browser), so fold the full-circle angle into that range.
@@ -31,4 +39,11 @@ export function gravityToTilt(x: number, y: number, z: number): Tilt {
   const beta = Math.atan2(-y, cosBeta)
 
   return { beta: beta * RAD_TO_DEG, gamma: gamma * RAD_TO_DEG }
+}
+
+/** The reverse of `gravityToTilt`: which way gravity points for a given beta/gamma. */
+export function tiltToGravity(beta: number, gamma: number): Vec3 {
+  const b = beta * DEG_TO_RAD
+  const g = gamma * DEG_TO_RAD
+  return { x: Math.cos(b) * Math.sin(g), y: -Math.sin(b), z: -Math.cos(b) * Math.cos(g) }
 }
