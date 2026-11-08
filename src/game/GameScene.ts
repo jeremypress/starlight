@@ -2,11 +2,14 @@ import Phaser from 'phaser'
 import { spawnIntervalMs, randomAsteroidSize, spawnXNearPlayer } from './asteroids.ts'
 import { difficultyAt } from './difficulty.ts'
 import { triangleRectOverlap } from './collision.ts'
+import { DEFAULT_GRAVITY, onGravity } from '../input/tilt.ts'
+import { relativeTilt } from '../input/relativeTilt.ts'
+import type { Vec3 } from '../input/gravityToTilt.ts'
 
 export class GameScene extends Phaser.Scene {
   private ship!: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Sprite
-  private gyroX = 0
-  private gyroY = 0
+  /** Latest gravity reading from the phone. */
+  private gravity: Vec3 = DEFAULT_GRAVITY
   private stars: Phaser.GameObjects.Rectangle[] = []
   private scrollSpeed = 100 // px/s, controlled by forward/back tilt
   private tiltIndicator!: Phaser.GameObjects.Rectangle
@@ -22,13 +25,14 @@ export class GameScene extends Phaser.Scene {
 
   private onGameOver?: (distance: number) => void
 
-  constructor(private betaOffset: number, onGameOver?: (distance: number) => void) {
+  /** `reference` is the gravity reading captured at calibration — the "neutral" pose. */
+  constructor(private reference: Vec3, onGameOver?: (distance: number) => void) {
     super({ key: 'GameScene' })
     this.onGameOver = onGameOver
   }
 
-  setBetaOffset(offset: number) {
-    this.betaOffset = offset
+  setReference(reference: Vec3) {
+    this.reference = reference
   }
 
   preload() {
@@ -89,8 +93,11 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'monospace',
     })
 
-    // Listen for device orientation
-    window.addEventListener('deviceorientation', this.handleOrientation.bind(this))
+    // Listen for motion (CoreMotion in the iOS app, deviceorientation in a browser)
+    const unsubscribe = onGravity((gravity) => {
+      this.gravity = gravity
+    })
+    this.events.once(Phaser.Scenes.Events.DESTROY, unsubscribe)
 
     // Instructions
     this.add.text(180, 50, 'Tilt to move!', {
@@ -98,15 +105,6 @@ export class GameScene extends Phaser.Scene {
       color: '#ffffff',
       fontFamily: 'sans-serif',
     }).setOrigin(0.5)
-  }
-
-  private handleOrientation(event: DeviceOrientationEvent) {
-    // gamma: left/right tilt (-90 to 90)
-    // beta: front/back tilt (-180 to 180)
-    if (event.gamma !== null && event.beta !== null) {
-      this.gyroX = event.gamma
-      this.gyroY = event.beta
-    }
   }
 
   /** Reset game state for a fresh run (called on restart). */
@@ -139,8 +137,10 @@ export class GameScene extends Phaser.Scene {
     const maxSpeed = 300
     const dt = delta / 1000
 
-    const clampedX = Phaser.Math.Clamp(this.gyroX, -maxTiltX, maxTiltX)
-    const clampedY = Phaser.Math.Clamp(this.gyroY - this.betaOffset, -maxTiltY, maxTiltY)
+    // Tilt away from the calibrated pose: gamma = left/right, beta = forward/back
+    const tilt = relativeTilt(this.reference, this.gravity)
+    const clampedX = Phaser.Math.Clamp(tilt.gamma, -maxTiltX, maxTiltX)
+    const clampedY = Phaser.Math.Clamp(tilt.beta, -maxTiltY, maxTiltY)
 
     // X: tilt maps directly to velocity — instant direction change
     body.setAccelerationX(0)
@@ -281,9 +281,5 @@ export class GameScene extends Phaser.Scene {
 
   getDistanceScore(): number {
     return Math.floor(this.distanceTraveled / 100)
-  }
-
-  destroy() {
-    window.removeEventListener('deviceorientation', this.handleOrientation.bind(this))
   }
 }

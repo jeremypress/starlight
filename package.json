@@ -7,7 +7,9 @@
     "dev": "tsx scripts/dev.ts",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "ios": "pnpm build && cd ios && xcodegen && open Starlight.xcodeproj",
+    "ios:install": "tsx scripts/ios-install.ts"
   },
   "dependencies": {
     "phaser": "^3.87.0",

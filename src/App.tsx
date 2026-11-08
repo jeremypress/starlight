@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Phaser from 'phaser'
 import { GameScene } from './game/GameScene'
+import { DEFAULT_GRAVITY, isNativeApp, onGravity, requestTiltPermission } from './input/tilt.ts'
+import type { Vec3 } from './input/gravityToTilt.ts'
 
 type Phase = 'permission' | 'calibrating' | 'playing' | 'paused' | 'dead'
 
@@ -12,41 +14,28 @@ export default function App() {
   const containerRef = useRef<HTMLDivElement>(null)
   const [phase, setPhase] = useState<Phase>('permission')
   const [score, setScore] = useState(0)
-  const currentBetaRef = useRef<number | null>(null)
-  const betaOffsetRef = useRef<number | null>(null)
+  const currentGravityRef = useRef<Vec3 | null>(null)
+  const referenceRef = useRef<Vec3>(DEFAULT_GRAVITY)
 
   const requestGyroscope = async () => {
-    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
-      try {
-        const permission = await (DeviceOrientationEvent as any).requestPermission()
-        if (permission === 'granted') {
-          setPhase('calibrating')
-        }
-      } catch (err) {
-        console.error('Gyroscope permission denied:', err)
-      }
-    } else {
-      setPhase('calibrating')
-    }
+    if (await requestTiltPermission()) setPhase('calibrating')
   }
 
   const captureBetaAndPlay = () => {
-    // Capture current beta as the "resting" offset
-    betaOffsetRef.current = currentBetaRef.current ?? 45
+    // Capture how the phone is being held right now as the "neutral" pose
+    referenceRef.current = currentGravityRef.current ?? DEFAULT_GRAVITY
     if (sceneRef.current) {
-      sceneRef.current.setBetaOffset(betaOffsetRef.current)
+      sceneRef.current.setReference(referenceRef.current)
       sceneRef.current.scene.resume()
     }
     setPhase('playing')
   }
 
-  // Always track live beta so we can capture it on demand
+  // Always track live gravity so we can capture it on demand
   useEffect(() => {
-    const handler = (e: DeviceOrientationEvent) => {
-      if (e.beta !== null) currentBetaRef.current = e.beta
-    }
-    window.addEventListener('deviceorientation', handler)
-    return () => window.removeEventListener('deviceorientation', handler)
+    return onGravity((gravity) => {
+      currentGravityRef.current = gravity
+    })
   }, [])
 
   // Calibration: wait CALIBRATION_MS then capture beta and start/resume playing
@@ -62,7 +51,7 @@ export default function App() {
   useEffect(() => {
     if (phase !== 'playing' || !containerRef.current || gameRef.current) return
 
-    const scene = new GameScene(betaOffsetRef.current!, (distance) => {
+    const scene = new GameScene(referenceRef.current, (distance) => {
       setScore(distance)
       setPhase('dead')
     })
@@ -129,7 +118,7 @@ export default function App() {
         }}
       >
         <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>STARLIGHT</h1>
-        <p style={{ fontSize: '1.2rem', opacity: 0.8 }}>Tap to enable gyroscope</p>
+        <p style={{ fontSize: '1.2rem', opacity: 0.8 }}>{isNativeApp ? 'Tap to start' : 'Tap to enable gyroscope'}</p>
       </div>
     )
   }

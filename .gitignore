@@ -29,3 +29,8 @@ certs/
 *.crt
 *.key
 *.pem
+
+# iOS (Starlight.xcodeproj is generated from ios/project.yml by XcodeGen)
+ios/*.xcodeproj
+ios/build
+xcuserdata/
