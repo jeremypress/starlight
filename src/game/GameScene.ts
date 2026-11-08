@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { spawnIntervalMs, randomAsteroidSize, spawnXNearPlayer } from './asteroids.ts'
 import { difficultyAt } from './difficulty.ts'
 import { triangleRectOverlap } from './collision.ts'
+import { onTilt } from '../input/tilt.ts'
 
 export class GameScene extends Phaser.Scene {
   private ship!: Phaser.GameObjects.Rectangle | Phaser.GameObjects.Sprite
@@ -89,8 +90,12 @@ export class GameScene extends Phaser.Scene {
       fontFamily: 'monospace',
     })
 
-    // Listen for device orientation
-    window.addEventListener('deviceorientation', this.handleOrientation.bind(this))
+    // Listen for tilt (CoreMotion in the iOS app, deviceorientation in a browser)
+    const unsubscribe = onTilt(({ beta, gamma }) => {
+      this.gyroX = gamma // left/right tilt (-90 to 90)
+      this.gyroY = beta // front/back tilt (-180 to 180)
+    })
+    this.events.once(Phaser.Scenes.Events.DESTROY, unsubscribe)
 
     // Instructions
     this.add.text(180, 50, 'Tilt to move!', {
@@ -98,15 +103,6 @@ export class GameScene extends Phaser.Scene {
       color: '#ffffff',
       fontFamily: 'sans-serif',
     }).setOrigin(0.5)
-  }
-
-  private handleOrientation(event: DeviceOrientationEvent) {
-    // gamma: left/right tilt (-90 to 90)
-    // beta: front/back tilt (-180 to 180)
-    if (event.gamma !== null && event.beta !== null) {
-      this.gyroX = event.gamma
-      this.gyroY = event.beta
-    }
   }
 
   /** Reset game state for a fresh run (called on restart). */
@@ -281,9 +277,5 @@ export class GameScene extends Phaser.Scene {
 
   getDistanceScore(): number {
     return Math.floor(this.distanceTraveled / 100)
-  }
-
-  destroy() {
-    window.removeEventListener('deviceorientation', this.handleOrientation.bind(this))
   }
 }

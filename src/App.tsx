@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Phaser from 'phaser'
 import { GameScene } from './game/GameScene'
+import { isNativeApp, onTilt, requestTiltPermission } from './input/tilt.ts'
 
 type Phase = 'permission' | 'calibrating' | 'playing' | 'paused' | 'dead'
 
@@ -16,18 +17,7 @@ export default function App() {
   const betaOffsetRef = useRef<number | null>(null)
 
   const requestGyroscope = async () => {
-    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
-      try {
-        const permission = await (DeviceOrientationEvent as any).requestPermission()
-        if (permission === 'granted') {
-          setPhase('calibrating')
-        }
-      } catch (err) {
-        console.error('Gyroscope permission denied:', err)
-      }
-    } else {
-      setPhase('calibrating')
-    }
+    if (await requestTiltPermission()) setPhase('calibrating')
   }
 
   const captureBetaAndPlay = () => {
@@ -42,11 +32,9 @@ export default function App() {
 
   // Always track live beta so we can capture it on demand
   useEffect(() => {
-    const handler = (e: DeviceOrientationEvent) => {
-      if (e.beta !== null) currentBetaRef.current = e.beta
-    }
-    window.addEventListener('deviceorientation', handler)
-    return () => window.removeEventListener('deviceorientation', handler)
+    return onTilt(({ beta }) => {
+      currentBetaRef.current = beta
+    })
   }, [])
 
   // Calibration: wait CALIBRATION_MS then capture beta and start/resume playing
@@ -129,7 +117,7 @@ export default function App() {
         }}
       >
         <h1 style={{ fontSize: '2rem', marginBottom: '1rem' }}>STARLIGHT</h1>
-        <p style={{ fontSize: '1.2rem', opacity: 0.8 }}>Tap to enable gyroscope</p>
+        <p style={{ fontSize: '1.2rem', opacity: 0.8 }}>{isNativeApp ? 'Tap to start' : 'Tap to enable gyroscope'}</p>
       </div>
     )
   }
